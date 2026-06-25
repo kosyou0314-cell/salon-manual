@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>サロン運営管理システム</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f8f7f4;--bg3:#f1f0ec;
+  --text:#1a1a18;--text2:#5c5b57;--text3:#888780;
+  --border:#e0dfd8;--border2:#c8c7c0;
+  --purple:#7F77DD;--purple-bg:#EEEDFE;--purple-text:#3C3489;
+  --teal:#1D9E75;--teal-bg:#E1F5EE;--teal-text:#085041;
+  --coral:#D85A30;--coral-bg:#FAECE7;--coral-text:#712B13;
+  --amber:#BA7517;--amber-bg:#FAEEDA;--amber-text:#633806;
+  --blue:#378ADD;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+  --green:#639922;--green-bg:#EAF3DE;--green-text:#27500A;
+  --red:#E24B4A;--red-bg:#FCEBEB;--red-text:#791F1F;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1a;--bg2:#242422;--bg3:#2c2c2a;
+  --text:#f0efe8;--text2:#b4b2a9;--text3:#888780;
+  --border:#3c3c38;--border2:#4a4a46;
+  --purple-bg:#3C3489;--purple-text:#CECBF6;
+  --teal-bg:#085041;--teal-text:#9FE1CB;
+  --coral-bg:#712B13;--coral-text:#F5C4B3;
+  --amber-bg:#633806;--amber-text:#FAC775;
+  --blue-bg:#0C447C;--blue-text:#B5D4F4;
+  --green-bg:#27500A;--green-text:#C0DD97;
+  --red-bg:#791F1F;--red-text:#F7C1C1;
+}}
+body{font-family:"Hiragino Sans","Yu Gothic",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ロック画面 */
+#lock-screen{position:fixed;inset:0;background:var(--bg2);display:flex;align-items:center;justify-content:center;z-index:9999;-webkit-tap-highlight-color:transparent}
+.lock-card{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-lg);padding:2.5rem 2rem;width:320px;text-align:center;box-shadow:0 4px 32px rgba(0,0,0,.08)}
+.lock-icon{font-size:44px;margin-bottom:1rem}
+.lock-title{font-size:20px;font-weight:500;margin-bottom:.25rem}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:1.75rem}
+.lock-dots{display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem;height:16px}
+.lock-dot{width:14px;height:14px;border-radius:50%;background:var(--border2);transition:background .15s}
+.lock-dot.filled{background:var(--purple)}
+.lock-numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:240px;margin:0 auto}
+.lock-key{padding:18px 8px;font-size:22px;font-weight:400;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .1s;user-select:none}
+.lock-key:active{background:var(--purple-bg)}
+.lock-key.del{font-size:16px;color:var(--text3)}
+.lock-key.empty{background:transparent;border-color:transparent;pointer-events:none}
+.lock-error{color:var(--red-text);font-size:12px;margin-top:1rem;min-height:18px}
+.lock-hint{font-size:11px;color:var(--text3);margin-top:.75rem}
+
+/* アプリ本体 */
+#app{display:none}
+.app{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--bg2);border-right:0.5px solid var(--border);padding:1rem 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:.75rem 1rem 1rem;font-size:15px;font-weight:500;border-bottom:0.5px solid var(--border);margin-bottom:.5rem}
+.sidebar-logo span{font-size:11px;color:var(--text3);display:block;font-weight:400;margin-top:2px}
+.nav-section{padding:.5rem 1rem .25rem;font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.05em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:8px;padding:.5rem 1rem;font-size:13px;color:var(--text2);cursor:pointer;border-radius:0;transition:all .1s}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--purple-bg);color:var(--purple-text);font-weight:500}
+.nav-item .icon{width:18px;text-align:center;font-size:16px}
+.main{flex:1;overflow-y:auto}
+.page{display:none;padding:1.5rem;max-width:960px}
+.page.active{display:block}
+.page-title{font-size:20px;font-weight:500;margin-bottom:.25rem}
+.page-sub{font-size:13px;color:var(--text3);margin-bottom:1.5rem}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:500;margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1rem}
+.metric{background:var(--bg2);border-radius:var(--radius);padding:.875rem 1rem}
+.metric-label{font-size:11px;color:var(--text3);margin-bottom:4px}
+.metric-val{font-size:22px;font-weight:500}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500}
+.badge-purple{background:var(--purple-bg);color:var(--purple-text)}
+.badge-teal{background:var(--teal-bg);color:var(--teal-text)}
+.badge-coral{background:var(--coral-bg);color:var(--coral-text)}
+.badge-amber{background:var(--amber-bg);color:var(--amber-text)}
+.badge-blue{background:var(--blue-bg);color:var(--blue-text)}
+.badge-red{background:var(--red-bg);color:var(--red-text)}
+.badge-green{background:var(--green-bg);color:var(--green-text)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:6px 10px;font-size:11px;font-weight:500;color:var(--text3);border-bottom:0.5px solid var(--border2);background:var(--bg2)}
+td{padding:8px 10px;border-bottom:0.5px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg2)}
+input,select,textarea{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-size:13px;font-family:inherit;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 2px rgba(127,119,221,.15)}
+button{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius);padding:7px 14px;color:var(--text);font-size:13px;cursor:pointer;font-family:inherit}
+button:hover{background:var(--bg2)}
+button.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+button.primary:hover{opacity:.9}
+button.small{padding:4px 10px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:.75rem}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field{margin-bottom:.75rem}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
+.warn-box{background:var(--amber-bg);border-left:3px solid var(--amber);padding:.75rem 1rem;border-radius:0 var(--radius) var(--radius) 0;font-size:13px;color:var(--amber-text);margin-bottom:1rem}
+.ok-box{background:var(--green-bg);border-left:3px solid var(--green);padding:.75rem 1rem;border-radius:0 var(--radius) var(--radius) 0;font-size:13px;color:var(--green-text);margin-bottom:1rem}
+.danger-box{background:var(--red-bg);border-left:3px solid var(--red);padding:.75rem 1rem;border-radius:0 var(--radius) var(--radius) 0;font-size:13px;color:var(--red-text);margin-bottom:1rem}
+.progress-bar{background:var(--border);border-radius:99px;height:8px;overflow:hidden;margin-top:4px}
+.progress-fill{height:100%;border-radius:99px;transition:width .3s}
+.checklist{list-style:none}
+.checklist li{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.checklist li:last-child{border-bottom:none}
+.checklist input[type=checkbox]{width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--purple)}
+.checklist .done{text-decoration:line-through;color:var(--text3)}
+.tabs{display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap}
+.tab{padding:6px 14px;border:0.5px solid var(--border2);border-radius:99px;font-size:13px;cursor:pointer;color:var(--text2)}
+.tab.active{background:var(--purple-bg);border-color:var(--purple);color:var(--purple-text);font-weight:500}
+.section-hr{border:none;border-top:0.5px solid var(--border);margin:1rem 0}
+.legal-note{background:var(--blue-bg);border-radius:var(--radius);padding:.75rem 1rem;font-size:12px;color:var(--blue-text);margin-bottom:.75rem}
+.legal-note strong{font-weight:500}
+.alert-row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:13px}
+.alert-row:last-child{border-bottom:none}
+@media(max-width:600px){.sidebar{width:100%;height:auto;position:relative}.app{flex-direction:column}.row2,.row3{grid-template-columns:1fr}.metric-val{font-size:18px}}
+</style>
+</head>
+<body>
+
+<!-- ロック画面 -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">✂</div>
+    <div class="lock-title">サロン管理</div>
+    <div class="lock-sub">暗証番号を入力してください</div>
+    <div class="lock-dots">
+      <div class="lock-dot" id="d0"></div>
+      <div class="lock-dot" id="d1"></div>
+      <div class="lock-dot" id="d2"></div>
+      <div class="lock-dot" id="d3"></div>
+    </div>
+    <div class="lock-numpad">
+      <div class="lock-key" onclick="lockKey('1')">1</div>
+      <div class="lock-key" onclick="lockKey('2')">2</div>
+      <div class="lock-key" onclick="lockKey('3')">3</div>
+      <div class="lock-key" onclick="lockKey('4')">4</div>
+      <div class="lock-key" onclick="lockKey('5')">5</div>
+      <div class="lock-key" onclick="lockKey('6')">6</div>
+      <div class="lock-key" onclick="lockKey('7')">7</div>
+      <div class="lock-key" onclick="lockKey('8')">8</div>
+      <div class="lock-key" onclick="lockKey('9')">9</div>
+      <div class="lock-key empty"></div>
+      <div class="lock-key" onclick="lockKey('0')">0</div>
+      <div class="lock-key del" onclick="lockDel()">⌫</div>
+    </div>
+    <div class="lock-error" id="lock-error"></div>
+    <div class="lock-hint">初期コード：1234　※設定から変更できます</div>
+  </div>
+</div>
+
+<!-- アプリ本体 -->
+<div id="app">
+<div class="app">
+<div class="sidebar">
+  <div class="sidebar-logo">✂ サロン管理<span>運営支援システム</span></div>
+  <div class="nav-section">概要</div>
+  <div class="nav-item active" onclick="nav('dashboard')"><span class="icon">⊞</span>ダッシュボード</div>
+  <div class="nav-item" onclick="nav('daily')"><span class="icon">☀</span>今日のやること</div>
+  <div class="nav-item" onclick="nav('weekly')"><span class="icon">📋</span>今週のやること</div>
+  <div class="nav-item" onclick="nav('monthly')"><span class="icon">📅</span>今月のやること</div>
+  <div class="nav-item" onclick="nav('annual')"><span class="icon">📊</span>年間計画</div>
+  <div class="nav-section">スタッフ</div>
+  <div class="nav-item" onclick="nav('staff')"><span class="icon">👤</span>スタッフ管理</div>
+  <div class="nav-item" onclick="nav('overtime')"><span class="icon">⏰</span>残業・有給届</div>
+  <div class="nav-section">業務委託</div>
+  <div class="nav-item" onclick="nav('outsource')"><span class="icon">📝</span>業務委託管理</div>
+  <div class="nav-item" onclick="nav('material')"><span class="icon">🧴</span>材料費計算</div>
+  <div class="nav-section">在庫</div>
+  <div class="nav-item" onclick="nav('inventory')"><span class="icon">📦</span>在庫チェック</div>
+  <div class="nav-section">書類</div>
+  <div class="nav-item" onclick="nav('forms')"><span class="icon">📄</span>各種申請書</div>
+  <div class="nav-section">設定</div>
+  <div class="nav-item" onclick="nav('settings')"><span class="icon">⚙</span>暗証番号変更</div>
+  <div style="padding:.75rem 1rem;margin-top:auto">
+    <button onclick="lockOut()" style="width:100%;font-size:12px;color:var(--text3);border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;padding:7px;cursor:pointer">ロック画面に戻る</button>
+  </div>
+</div>
+<div class="main" id="main">
+
+<!-- ダッシュボード -->
+<div class="page active" id="page-dashboard">
+<div class="page-title">ダッシュボード</div>
+<div class="page-sub" id="today-date"></div>
+<div class="metric-grid">
+  <div class="metric"><div class="metric-label">今月売上</div><div class="metric-val" id="m-sales">¥0</div><div class="metric-sub">目標比 <span id="m-sales-ratio">—</span></div></div>
+  <div class="metric"><div class="metric-label">今日の予約</div><div class="metric-val" id="m-resv">0</div><div class="metric-sub">件</div></div>
+  <div class="metric"><div class="metric-label">材料費率</div><div class="metric-val" id="m-mat">—</div><div class="metric-sub">目安60%以内</div></div>
+  <div class="metric"><div class="metric-label">在庫アラート</div><div class="metric-val" id="m-inv">0</div><div class="metric-sub">品目</div></div>
+</div>
+<div id="dash-alerts"></div>
+<div class="row2">
+  <div class="card">
+    <div class="card-title">📋 今日のチェックリスト</div>
+    <ul class="checklist" id="daily-dash-list"></ul>
+    <div class="btn-row"><button onclick="nav('daily')">詳細を見る</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">👥 スタッフ状況</div>
+    <div id="staff-dash"></div>
+    <div class="btn-row"><button onclick="nav('staff')">詳細を見る</button></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-title">📊 月次売上推移</div>
+  <div style="position:relative;height:220px"><canvas id="salesChart" role="img" aria-label="月次売上推移グラフ"></canvas></div>
+</div>
+</div>
+
+<!-- 今日のやること -->
+<div class="page" id="page-daily">
+<div class="page-title">今日のやること</div>
+<div class="page-sub">毎日の業務チェックリスト</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'daily-open')">開店前</div>
+  <div class="tab" onclick="subTab(this,'daily-work')">営業中</div>
+  <div class="tab" onclick="subTab(this,'daily-close')">閉店後</div>
+  <div class="tab" onclick="subTab(this,'daily-legal')">法律確認事項</div>
+</div>
+<div id="daily-open">
+  <div class="card"><div class="card-title">開店前チェック</div>
+  <ul class="checklist" id="cl-open"></ul></div>
+</div>
+<div id="daily-work" style="display:none">
+  <div class="card"><div class="card-title">営業中チェック</div>
+  <ul class="checklist" id="cl-work"></ul></div>
+</div>
+<div id="daily-close" style="display:none">
+  <div class="card"><div class="card-title">閉店後チェック</div>
+  <ul class="checklist" id="cl-close"></ul></div>
+</div>
+<div id="daily-legal" style="display:none">
+  <div class="card"><div class="card-title">法律・労務 確認事項（毎日）</div>
+  <div class="legal-note"><strong>週44時間特例事業所</strong>（10人未満の美容業）に基づく確認です。</div>
+  <ul class="checklist" id="cl-legal"></ul></div>
+</div>
+</div>
+
+<!-- 今週のやること -->
+<div class="page" id="page-weekly">
+<div class="page-title">今週のやること</div>
+<div class="page-sub">週次業務・確認リスト</div>
+<div class="card">
+  <div class="card-title">週次業務チェック</div>
+  <ul class="checklist" id="cl-weekly"></ul>
+</div>
+<div class="card">
+  <div class="card-title">⚖ 今週の労働時間確認</div>
+  <div class="legal-note"><strong>法定労働時間</strong>：週44時間（特例）。超過分は割増賃金（25%以上）が必要です。</div>
+  <div id="weekly-hours-table"></div>
+</div>
+</div>
+
+<!-- 今月のやること -->
+<div class="page" id="page-monthly">
+<div class="page-title">今月のやること</div>
+<div class="page-sub">月次業務・締め作業</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'mon-ops')">業務</div>
+  <div class="tab" onclick="subTab(this,'mon-labor')">労務</div>
+  <div class="tab" onclick="subTab(this,'mon-finance')">経理</div>
+</div>
+<div id="mon-ops"><div class="card"><div class="card-title">月次業務チェック</div><ul class="checklist" id="cl-monthly-ops"></ul></div></div>
+<div id="mon-labor" style="display:none">
+  <div class="card"><div class="card-title">月次労務チェック</div>
+  <div class="legal-note"><strong>毎月確認必須</strong>：給与計算・有給付与・残業代計算・社会保険手続き</div>
+  <ul class="checklist" id="cl-monthly-labor"></ul></div>
+</div>
+<div id="mon-finance" style="display:none">
+  <div class="card"><div class="card-title">月次経理チェック</div>
+  <ul class="checklist" id="cl-monthly-finance"></ul></div>
+</div>
+</div>
+
+<!-- 年間計画 -->
+<div class="page" id="page-annual">
+<div class="page-title">年間計画</div>
+<div class="page-sub">年間の重要イベント・労務・経営カレンダー</div>
+<div id="annual-calendar"></div>
+</div>
+
+<!-- スタッフ管理 -->
+<div class="page" id="page-staff">
+<div class="page-title">スタッフ管理</div>
+<div class="page-sub">雇用形態別・労働時間・有給管理</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'staff-list')">スタッフ一覧</div>
+  <div class="tab" onclick="subTab(this,'staff-add')">スタッフ追加</div>
+  <div class="tab" onclick="subTab(this,'staff-law')">雇用形態別 法律ポイント</div>
+</div>
+<div id="staff-list">
+  <div class="card"><div id="staff-table-wrap"></div></div>
+</div>
+<div id="staff-add" style="display:none">
+  <div class="card"><div class="card-title">スタッフ登録</div>
+  <div class="row2">
+    <div class="field"><label>氏名</label><input id="s-name" placeholder="山田 花子"></div>
+    <div class="field"><label>雇用形態</label><select id="s-type"><option value="正社員">正社員</option><option value="時短正社員">時短正社員</option><option value="パート">パート</option></select></div>
+    <div class="field"><label>所定労働時間/週（時間）</label><input type="number" id="s-hours" placeholder="44"></div>
+    <div class="field"><label>時給 / 月給（円）</label><input type="number" id="s-wage" placeholder="1100"></div>
+    <div class="field"><label>入社日</label><input type="date" id="s-join"></div>
+    <div class="field"><label>有給残日数</label><input type="number" id="s-paid-days" placeholder="10"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="addStaff()">登録する</button></div>
+  </div>
+</div>
+<div id="staff-law" style="display:none">
+  <div class="card"><div class="card-title">雇用形態別 労働法ポイント</div>
+  <div class="warn-box">⚠ 以下は一般的な目安です。必ず社会保険労務士や労働基準監督署に確認してください。</div>
+  <h3 style="font-size:14px;font-weight:500;margin-bottom:.5rem">正社員（週44時間特例）</h3>
+  <ul style="font-size:13px;color:var(--text2);padding-left:1.2rem;margin-bottom:1rem">
+    <li>週44時間超から割増賃金25%発生</li><li>1日8時間超から割増賃金25%発生</li><li>年次有給休暇：6ヶ月継続勤務・8割以上出勤で10日付与</li><li>社会保険加入義務あり</li><li>36協定なしで週44時間超の残業は違法</li>
+  </ul>
+  <h3 style="font-size:14px;font-weight:500;margin-bottom:.5rem">時短正社員</h3>
+  <ul style="font-size:13px;color:var(--text2);padding-left:1.2rem;margin-bottom:1rem">
+    <li>所定労働時間が短い正社員。正社員と同じ権利を持つ</li><li>割増賃金は「所定時間超〜法定8時間」の間は割増なし可（就業規則による）</li><li>ただし法定時間（1日8時間・週44時間）超えたら必ず25%以上割増</li><li>有給休暇は勤務日数に応じた比例付与</li><li>社会保険：週20時間以上で加入検討必要</li>
+  </ul>
+  <h3 style="font-size:14px;font-weight:500;margin-bottom:.5rem">パート</h3>
+  <ul style="font-size:13px;color:var(--text2);padding-left:1.2rem;margin-bottom:1rem">
+    <li>週30時間以上→社会保険加入義務</li><li>週20時間以上→雇用保険加入義務</li><li>有給：週4日以上または年216日以上勤務で比例付与</li><li>扶養内（130万円）の管理が重要</li><li>週の累計時間が44時間超えたら割増賃金必要</li>
+  </ul>
+  </div>
+</div>
+</div>
+
+<!-- 業務委託管理 -->
+<div class="page" id="page-outsource">
+<div class="page-title">業務委託管理</div>
+<div class="page-sub">業務委託者の報酬・材料費管理（報酬率55%）</div>
+<div class="legal-note"><strong>業務委託の法律的注意点：</strong>雇用契約ではないため労働基準法の適用外ですが、実態が「労働者」に近い場合は「偽装請負」とみなされるリスクがあります。指揮命令・時間拘束・専属性などを確認してください。</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'out-list')">委託者一覧</div>
+  <div class="tab" onclick="subTab(this,'out-add')">委託者追加</div>
+  <div class="tab" onclick="subTab(this,'out-calc')">報酬計算</div>
+</div>
+<div id="out-list">
+  <div class="card"><div id="outsource-table-wrap"></div></div>
+</div>
+<div id="out-add" style="display:none">
+  <div class="card"><div class="card-title">委託者登録</div>
+  <div class="row2">
+    <div class="field"><label>氏名・屋号</label><input id="o-name" placeholder="田中 美容室"></div>
+    <div class="field"><label>報酬率（%）</label><input type="number" id="o-rate" value="55" max="100"></div>
+    <div class="field"><label>材料費上限率（%）<br><small style="color:var(--text3)">この率を超えたら請求</small></label><input type="number" id="o-mat-limit" value="60"></div>
+    <div class="field"><label>契約開始日</label><input type="date" id="o-start"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="addOutsource()">登録する</button></div>
+  </div>
+</div>
+<div id="out-calc" style="display:none">
+  <div class="card"><div class="card-title">報酬・材料費 計算シート</div>
+  <div class="row2">
+    <div class="field"><label>委託者を選択</label><select id="calc-person"><option value="">— 選択 —</option></select></div>
+    <div class="field"><label>対象月</label><input type="month" id="calc-month"></div>
+    <div class="field"><label>総売上（円）</label><input type="number" id="calc-sales" placeholder="300000"></div>
+    <div class="field"><label>パーツ材料費（委託者本人負担）（円）</label><input type="number" id="calc-parts" placeholder="50000"></div>
+    <div class="field"><label>その他材料費（サロン負担）（円）</label><input type="number" id="calc-other" placeholder="80000"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="calcOutsource()">計算する</button></div>
+  <div id="calc-result" style="margin-top:1rem"></div>
+  </div>
+</div>
+</div>
+
+<!-- 材料費計算 -->
+<div class="page" id="page-material">
+<div class="page-title">材料費計算</div>
+<div class="page-sub">売上に対する材料費比率の管理・請求判定</div>
+<div class="card">
+  <div class="card-title">材料費比率チェッカー</div>
+  <div class="row3">
+    <div class="field"><label>月間総売上（円）</label><input type="number" id="mat-sales" placeholder="500000" oninput="calcMat()"></div>
+    <div class="field"><label>サロン負担材料費（円）</label><input type="number" id="mat-cost" placeholder="180000" oninput="calcMat()"></div>
+    <div class="field"><label>上限率（%）</label><input type="number" id="mat-limit" value="60" oninput="calcMat()"></div>
+  </div>
+  <div id="mat-result"></div>
+</div>
+<div class="card">
+  <div class="card-title">業務委託者別 材料費請求表</div>
+  <div id="mat-bill-table"></div>
+</div>
+</div>
+
+<!-- 在庫チェック -->
+<div class="page" id="page-inventory">
+<div class="page-title">在庫チェック</div>
+<div class="page-sub">消耗品・材料の在庫管理</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'inv-list')">在庫一覧</div>
+  <div class="tab" onclick="subTab(this,'inv-add')">品目追加</div>
+  <div class="tab" onclick="subTab(this,'inv-alert')">アラート</div>
+</div>
+<div id="inv-list">
+  <div class="card"><div id="inv-table-wrap"></div></div>
+</div>
+<div id="inv-add" style="display:none">
+  <div class="card"><div class="card-title">品目登録</div>
+  <div class="row3">
+    <div class="field"><label>品名</label><input id="inv-name" placeholder="カラー剤 A"></div>
+    <div class="field"><label>カテゴリ</label><select id="inv-cat"><option>カラー剤</option><option>薬剤</option><option>消耗品</option><option>備品</option><option>その他</option></select></div>
+    <div class="field"><label>現在庫数</label><input type="number" id="inv-qty" placeholder="10"></div>
+    <div class="field"><label>アラート数（この数以下で警告）</label><input type="number" id="inv-alert" placeholder="3"></div>
+    <div class="field"><label>単価（円）</label><input type="number" id="inv-price" placeholder="2000"></div>
+    <div class="field"><label>備考</label><input id="inv-note" placeholder="発注先など"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="addInv()">登録する</button></div>
+  </div>
+</div>
+<div id="inv-alert">
+  <div class="card"><div class="card-title">在庫アラート一覧</div><div id="inv-alert-list"></div></div>
+</div>
+</div>
+
+<!-- 各種申請書 -->
+<div class="page" id="page-forms">
+<div class="page-title">各種申請書</div>
+<div class="page-sub">印刷・共有できる申請書フォーム</div>
+<div class="tabs">
+  <div class="tab active" onclick="subTab(this,'form-ot')">時間外労働申請・報告書</div>
+  <div class="tab" onclick="subTab(this,'form-pl')">有給休暇届</div>
+</div>
+<div id="form-ot">
+  <div class="card"><div class="card-title">【時間外労働（残業）申請・報告書】</div>
+  <div class="row2">
+    <div class="field"><label>提出日</label><input type="date" id="ot-date"></div>
+    <div class="field"><label>氏名</label><input id="ot-name" placeholder="山田 花子"></div>
+    <div class="field"><label>区分</label><select id="ot-type"><option>申請（事前）</option><option>報告（事後）</option></select></div>
+    <div class="field"><label>対象日</label><input type="date" id="ot-tgt" oninput="setWeekday()"></div>
+    <div class="field"><label>曜日</label><input id="ot-day" readonly style="background:var(--bg2)"></div>
+    <div class="field"><label>所定シフト</label><input id="ot-shift" placeholder="10:00〜19:00"></div>
+    <div class="field"><label>退勤時刻</label><input id="ot-actual" placeholder="20:30"></div>
+    <div class="field"><label>時間外時間</label><input id="ot-extra" placeholder="1時間30分"></div>
+    <div class="field"><label>今週の累計時間</label><input id="ot-weekly" placeholder="42時間00分"></div>
+  </div>
+  <div class="field"><label>対象業務・理由</label><textarea id="ot-reason" rows="3" placeholder="急な混雑による接客・締め作業の遅れ等"></textarea></div>
+  <div class="row2">
+    <div class="field"><label>承認日</label><input type="date" id="ot-apv-date"></div>
+    <div class="field"><label>承認者名</label><input id="ot-apv-name" placeholder="店長 鈴木"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="printOT()">印刷・PDF保存</button></div>
+  </div>
+</div>
+<div id="form-pl" style="display:none">
+  <div class="card"><div class="card-title">【有給休暇届】</div>
+  <div class="row2">
+    <div class="field"><label>提出日</label><input type="date" id="pl-date"></div>
+    <div class="field"><label>氏名</label><input id="pl-name" placeholder="山田 花子"></div>
+    <div class="field"><label>取得区分</label><select id="pl-type"><option>全日休暇</option><option>半日（午前）</option><option>半日（午後）</option><option>時間単位</option></select></div>
+    <div class="field"><label>取得日</label><input type="date" id="pl-tgt"></div>
+    <div class="field"><label>取得理由（任意）</label><input id="pl-reason" placeholder="私用"></div>
+    <div class="field"><label>有給残日数</label><input type="number" id="pl-remain" placeholder="8"></div>
+    <div class="field"><label>承認日</label><input type="date" id="pl-apv-date"></div>
+    <div class="field"><label>承認者名</label><input id="pl-apv-name" placeholder="店長 鈴木"></div>
+  </div>
+  <div class="btn-row"><button class="primary" onclick="printPL()">印刷・PDF保存</button></div>
+  </div>
+</div>
+</div>
+
+
+<!-- 暗証番号変更 -->
+<div class="page" id="page-settings">
+<div class="page-title">暗証番号変更</div>
+<div class="page-sub">管理者のみ変更してください</div>
+<div class="card" style="max-width:360px">
+  <div class="field"><label>現在の暗証番号</label><input type="password" id="pin-old" inputmode="numeric" pattern="[0-9]*" placeholder="現在のコード"></div>
+  <div class="field"><label>新しい暗証番号（4〜8桁）</label><input type="password" id="pin-new" inputmode="numeric" pattern="[0-9]*" placeholder="新しいコード"></div>
+  <div class="field"><label>新しい暗証番号（確認）</label><input type="password" id="pin-new2" inputmode="numeric" pattern="[0-9]*" placeholder="もう一度入力"></div>
+  <div id="pin-msg"></div>
+  <div class="btn-row"><button class="primary" onclick="changePin()">変更する</button></div>
+  <div class="warn-box" style="margin-top:1rem;font-size:12px">変更後はスタッフへ口頭で新しいコードを伝えてください。<br>コードはこのiPadのブラウザに保存されます。</div>
+</div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+const DAYS=['日','月','火','水','木','金','土'];
+let staffList=JSON.parse(localStorage.getItem('staff')||'[]');
+let outsourceList=JSON.parse(localStorage.getItem('outsource')||'[]');
+let invList=JSON.parse(localStorage.getItem('inventory')||'[]');
+let salesData=JSON.parse(localStorage.getItem('salesData')||'[0,0,0,0,0,0,0,0,0,0,0,0]');
+
+function save(){localStorage.setItem('staff',JSON.stringify(staffList));localStorage.setItem('outsource',JSON.stringify(outsourceList));localStorage.setItem('inventory',JSON.stringify(invList));localStorage.setItem('salesData',JSON.stringify(salesData));}
+
+function nav(id){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const navEl=document.querySelector(`.nav-item[onclick="nav('${id}')"]`);
+  if(navEl)navEl.classList.add('active');
+  const pg=document.getElementById('page-'+id);
+  if(pg)pg.classList.add('active');
+  renderPage(id);
+}
+
+function subTab(el,targetId){
+  const parent=el.closest('.page');
+  parent.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const tabs=el.closest('.tabs');
+  let next=tabs.nextElementSibling;
+  while(next){if(next.id){next.style.display='none';}next=next.nextElementSibling;}
+  const target=document.getElementById(targetId);
+  if(target)target.style.display='';
+}
+
+function renderPage(id){
+  if(id==='dashboard')renderDashboard();
+  if(id==='daily')renderChecklists();
+  if(id==='weekly')renderWeekly();
+  if(id==='monthly')renderMonthly();
+  if(id==='annual')renderAnnual();
+  if(id==='staff')renderStaff();
+  if(id==='outsource')renderOutsource();
+  if(id==='inventory')renderInventory();
+  if(id==='material')renderMaterial();
+}
+
+const DAILY_OPEN=[
+  '前日シフト・予約件数を確認する',
+  '店内清掃・換気（床・鏡・洗面台）',
+  'タオル・ケープの補充確認',
+  'カラー剤・薬剤の在庫確認',
+  'POS・レジ・釣り銭確認',
+  '開店前の消耗品補充（コットン・ラップ等）',
+  '業務委託者への連絡・本日担当確認',
+];
+const DAILY_WORK=[
+  '予約時間の遅れがないか確認',
+  '使用材料の記録（委託者別）',
+  '清算・売上の途中集計',
+  'スタッフの休憩取得確認（6時間超→45分以上）',
+  '途中在庫切れのチェック',
+];
+const DAILY_CLOSE=[
+  '日次売上集計・レジ締め',
+  '使用材料費の記録（業務委託者別）',
+  '残業が発生した場合→申請書記入・管理者確認',
+  '翌日の予約・シフト確認',
+  '清掃・消毒（施術台・器具）',
+  '戸締まり・防犯確認',
+  '鍵・セキュリティ確認',
+];
+const DAILY_LEGAL=[
+  '1日8時間超の勤務者がいる場合→割増賃金（25%以上）確認',
+  'パートの扶養内時間超過がないか確認（週の累計）',
+  '業務委託者への指揮命令・時間拘束が過度でないか確認',
+  '未成年スタッフがいる場合→深夜22時以降勤務禁止の確認',
+];
+
+const WEEKLY=[
+  '週の労働時間合計を集計する（正社員・パート・時短別）',
+  '週44時間超えのスタッフがいないか確認',
+  'パートの扶養内上限時間の確認（残り時間の管理）',
+  '業務委託者の売上・材料費を集計する',
+  '来週のシフト作成・スタッフへの共有',
+  '在庫の週次確認・発注判断',
+  '残業申請書が提出されているか確認',
+  '有給申請書の確認・承認処理',
+  '掃除用品・消耗品の補充確認',
+];
+
+const MONTHLY_OPS=[
+  '月次売上集計・目標との比較',
+  '月次材料費率の確認（60%超えがいないか）',
+  '業務委託者への精算書作成・送付',
+  '来月のシフト作成（月末までに）',
+  '在庫の月次棚卸し',
+  '設備・機器のメンテナンス確認',
+  '顧客満足度・クレーム対応の振り返り',
+];
+const MONTHLY_LABOR=[
+  '給与計算（締め日・支払日の確認）',
+  '残業代の計算・反映（週44時間超分）',
+  '有給休暇の消化状況確認（年5日取得義務の進捗）',
+  '社会保険・雇用保険の手続き確認',
+  '新入社員がいる場合→試用期間・本採用の確認',
+  '勤続6ヶ月を迎えるスタッフへの有給付与確認',
+  '36協定の上限時間と残業実績の照合',
+  '育児・介護休業申請の有無確認',
+];
+const MONTHLY_FINANCE=[
+  '売上・経費の仕訳入力',
+  '業務委託費の支払い処理',
+  '材料費の仕訳（業務委託者分・自社分）',
+  '税理士・顧問との連絡（必要に応じて）',
+  '次月の予算・目標売上の設定',
+  '借入・リース支払いの確認',
+];
+
+function renderChecklists(){
+  renderCL('cl-open',DAILY_OPEN,'open');
+  renderCL('cl-work',DAILY_WORK,'work');
+  renderCL('cl-close',DAILY_CLOSE,'close');
+  renderCL('cl-legal',DAILY_LEGAL,'legal');
+}
+function renderCL(elId,items,prefix){
+  const el=document.getElementById(elId);if(!el)return;
+  el.innerHTML=items.map((t,i)=>{
+    const key=prefix+'_'+i;
+    const checked=sessionStorage.getItem(key)==='1';
+    return `<li><input type="checkbox" ${checked?'checked':''} onchange="toggleCL(this,'${key}')"><span class="${checked?'done':''}">${t}</span></li>`;
+  }).join('');
+}
+function toggleCL(cb,key){
+  sessionStorage.setItem(key,cb.checked?'1':'0');
+  const span=cb.nextElementSibling;
+  span.className=cb.checked?'done':'';
+}
+
+function renderWeekly(){
+  renderCL('cl-weekly',WEEKLY,'weekly');
+  const wrap=document.getElementById('weekly-hours-table');
+  if(!wrap)return;
+  const rows=staffList.filter(s=>s.type!=='業務委託').map(s=>{
+    const pct=Math.round((s.hours/44)*100);
+    const over=s.hours>44;
+    return `<div class="alert-row"><span>${s.name} <span class="badge badge-${s.type==='正社員'?'purple':s.type==='時短正社員'?'blue':'teal'}">${s.type}</span></span>
+    <span style="flex:1;margin:0 1rem"><div class="progress-bar"><div class="progress-fill" style="width:${Math.min(pct,100)}%;background:${over?'var(--red)':'var(--teal)'}"></div></div></span>
+    <span style="font-size:13px;color:${over?'var(--red)':'var(--text2)'}">${s.hours}h / 44h</span></div>`;
+  }).join('');
+  wrap.innerHTML=rows||'<p style="color:var(--text3);font-size:13px">スタッフを登録してください</p>';
+}
+
+function renderMonthly(){
+  renderCL('cl-monthly-ops',MONTHLY_OPS,'mon-ops');
+  renderCL('cl-monthly-labor',MONTHLY_LABOR,'mon-labor');
+  renderCL('cl-monthly-finance',MONTHLY_FINANCE,'mon-finance');
+}
+
+const ANNUAL_EVENTS=[
+  {m:1,items:['年始あいさつ・目標設定','有給5日取得義務の進捗確認（前年度分）','年末年始休暇精算']},
+  {m:2,items:['春需要の準備（予約受付開始）','確定申告準備（業務委託者への支払調書送付）']},
+  {m:3,items:['確定申告（3/15締切）','新年度シフト・体制検討','4月入社スタッフ準備']},
+  {m:4,items:['新スタッフ入社・オリエンテーション','社会保険算定基礎届の準備','新年度目標共有']},
+  {m:5,items:['GW勤務・残業管理','労働保険年度更新（6月末締切）の準備']},
+  {m:6,items:['労働保険年度更新・申告・納付','社会保険算定基礎届（7月1日提出）準備','半期振り返り']},
+  {m:7,items:['社会保険算定基礎届（7/1〜7/10提出）','夏季休暇シフト調整','下半期目標設定']},
+  {m:8,items:['夏季休暇（会社指定2日）','在庫棚卸し（半期）','有給消化状況の中間確認']},
+  {m:9,items:['秋需要の準備','有給5日取得の進捗確認','設備メンテナンス']},
+  {m:10,items:['年末需要の準備開始','来年度の採用計画検討','36協定の更新確認']},
+  {m:11,items:['年末シフト作成','有給5日取得の追い込み（年度末が近い方）','賞与・一時金の検討']},
+  {m:12,items:['年末年始休暇設定（1/1含む3日）','今年度の有給取得義務を必達','年次振り返り・来年度計画','給与所得の源泉徴収票作成準備']},
+];
+
+function renderAnnual(){
+  const wrap=document.getElementById('annual-calendar');
+  if(!wrap)return;
+  const now=new Date();
+  wrap.innerHTML=ANNUAL_EVENTS.map(ev=>{
+    const isNow=ev.m===now.getMonth()+1;
+    return `<div class="card" style="${isNow?'border-color:var(--purple);border-width:1.5px':''}">
+    <div class="card-title">${ev.m}月 <span class="badge badge-${isNow?'purple':'teal'}">${isNow?'今月':'予定'}</span></div>
+    <ul style="list-style:disc;padding-left:1.25rem;font-size:13px;color:var(--text2)">${ev.items.map(i=>`<li>${i}</li>`).join('')}</ul>
+    </div>`;
+  }).join('');
+}
+
+function renderDashboard(){
+  document.getElementById('today-date').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  const now=new Date();
+  const monthIdx=now.getMonth();
+  const monthlySales=salesData[monthIdx]||0;
+  document.getElementById('m-sales').textContent='¥'+monthlySales.toLocaleString();
+  document.getElementById('m-resv').textContent=Math.floor(Math.random()*8+3);
+  const matEl=document.getElementById('m-mat');
+  matEl.textContent='—';
+  const alertCount=invList.filter(i=>i.qty<=i.alertAt).length;
+  document.getElementById('m-inv').textContent=alertCount;
+  const alertBox=document.getElementById('dash-alerts');
+  let alerts='';
+  if(alertCount>0)alerts+=`<div class="warn-box">⚠ 在庫アラート：${alertCount}品目が発注ラインを下回っています</div>`;
+  alertBox.innerHTML=alerts;
+  const dailyList=document.getElementById('daily-dash-list');
+  if(dailyList)dailyList.innerHTML=DAILY_OPEN.slice(0,4).map((t,i)=>`<li><input type="checkbox" onchange="this.nextElementSibling.className=this.checked?'done':''"><span>${t}</span></li>`).join('');
+  const staffDash=document.getElementById('staff-dash');
+  if(staffDash){
+    if(staffList.length===0){staffDash.innerHTML='<p style="font-size:13px;color:var(--text3)">スタッフ未登録</p>';}
+    else{staffDash.innerHTML=staffList.slice(0,4).map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px"><span>${s.name}</span><span class="badge badge-${s.type==='正社員'?'purple':s.type==='時短正社員'?'blue':s.type==='パート'?'teal':'amber'}">${s.type}</span></div>`).join('');}
+  }
+  renderSalesChart();
+}
+
+let salesChartInstance=null;
+function renderSalesChart(){
+  const ctx=document.getElementById('salesChart');
+  if(!ctx)return;
+  if(salesChartInstance){salesChartInstance.destroy();}
+  salesChartInstance=new Chart(ctx,{
+    type:'bar',
+    data:{labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+    datasets:[{label:'売上',data:salesData,backgroundColor:'#CECBF6',borderColor:'#7F77DD',borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'¥'+v.toLocaleString()}}}}
+  });
+}
+
+function renderStaff(){
+  const wrap=document.getElementById('staff-table-wrap');
+  if(!wrap)return;
+  if(staffList.length===0){wrap.innerHTML='<p style="font-size:13px;color:var(--text3);padding:1rem">スタッフを追加してください</p>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>氏名</th><th>雇用形態</th><th>所定時間/週</th><th>時給/月給</th><th>入社日</th><th>有給残</th><th>操作</th></tr></thead><tbody>${
+    staffList.map((s,i)=>`<tr><td>${s.name}</td><td><span class="badge badge-${s.type==='正社員'?'purple':s.type==='時短正社員'?'blue':'teal'}">${s.type}</span></td><td>${s.hours}h</td><td>¥${Number(s.wage).toLocaleString()}</td><td>${s.join||'—'}</td><td>${s.paidDays}日</td><td><button class="small" onclick="delStaff(${i})">削除</button></td></tr>`)
+    .join('')}</tbody></table></div>`;
+}
+
+function addStaff(){
+  const name=document.getElementById('s-name').value;
+  if(!name)return alert('氏名を入力してください');
+  staffList.push({name,type:document.getElementById('s-type').value,hours:Number(document.getElementById('s-hours').value)||44,wage:document.getElementById('s-wage').value,join:document.getElementById('s-join').value,paidDays:Number(document.getElementById('s-paid-days').value)||0});
+  save();renderStaff();
+  document.getElementById('s-name').value='';
+  document.getElementById('s-hours').value='';
+  document.getElementById('s-wage').value='';
+  document.getElementById('s-paid-days').value='';
+}
+function delStaff(i){if(confirm('削除しますか？')){staffList.splice(i,1);save();renderStaff();}}
+
+function renderOutsource(){
+  const wrap=document.getElementById('outsource-table-wrap');
+  if(!wrap)return;
+  if(outsourceList.length===0){wrap.innerHTML='<p style="font-size:13px;color:var(--text3);padding:1rem">業務委託者を追加してください</p>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>氏名・屋号</th><th>報酬率</th><th>材料費上限率</th><th>契約開始</th><th>操作</th></tr></thead><tbody>${
+    outsourceList.map((o,i)=>`<tr><td>${o.name}</td><td>${o.rate}%</td><td>${o.matLimit}%</td><td>${o.start||'—'}</td><td><button class="small" onclick="delOut(${i})">削除</button></td></tr>`)
+    .join('')}</tbody></table></div>`;
+  const sel=document.getElementById('calc-person');
+  if(sel){sel.innerHTML='<option value="">— 選択 —</option>'+outsourceList.map((o,i)=>`<option value="${i}">${o.name}</option>`).join('');}
+}
+function addOutsource(){
+  const name=document.getElementById('o-name').value;
+  if(!name)return alert('氏名を入力してください');
+  outsourceList.push({name,rate:Number(document.getElementById('o-rate').value)||55,matLimit:Number(document.getElementById('o-mat-limit').value)||60,start:document.getElementById('o-start').value});
+  save();renderOutsource();
+  document.getElementById('o-name').value='';
+}
+function delOut(i){if(confirm('削除しますか？')){outsourceList.splice(i,1);save();renderOutsource();}}
+
+function calcOutsource(){
+  const idx=document.getElementById('calc-person').value;
+  const sales=Number(document.getElementById('calc-sales').value)||0;
+  const parts=Number(document.getElementById('calc-parts').value)||0;
+  const other=Number(document.getElementById('calc-other').value)||0;
+  const res=document.getElementById('calc-result');
+  if(idx===''){res.innerHTML='<div class="warn-box">委託者を選択してください</div>';return;}
+  const o=outsourceList[Number(idx)];
+  const totalMat=parts+other;
+  const matRatio=sales>0?Math.round((totalMat/sales)*100):0;
+  const matLimit=o.matLimit||60;
+  const overMat=totalMat-Math.floor(sales*matLimit/100);
+  const reward=Math.floor(sales*(o.rate/100));
+  const partsOwed=parts;
+  const billExtra=overMat>0?overMat:0;
+  const netReward=reward-billExtra;
+  res.innerHTML=`
+  <table style="margin-bottom:.75rem"><thead><tr><th>項目</th><th>金額</th><th>備考</th></tr></thead><tbody>
+  <tr><td>総売上</td><td>¥${sales.toLocaleString()}</td><td></td></tr>
+  <tr><td>報酬（${o.rate}%）</td><td>¥${reward.toLocaleString()}</td><td>支払い予定額</td></tr>
+  <tr><td>パーツ材料費（本人負担）</td><td>¥${parts.toLocaleString()}</td><td>委託者へそのまま支払</td></tr>
+  <tr><td>その他材料費（サロン負担）</td><td>¥${other.toLocaleString()}</td><td></td></tr>
+  <tr><td>材料費合計</td><td>¥${totalMat.toLocaleString()}</td><td>売上比 ${matRatio}%</td></tr>
+  <tr><td>材料費上限（${matLimit}%）</td><td>¥${Math.floor(sales*matLimit/100).toLocaleString()}</td><td></td></tr>
+  <tr style="${billExtra>0?'color:var(--red)':''}"><td>超過材料費（請求額）</td><td>¥${billExtra.toLocaleString()}</td><td>${billExtra>0?`⚠ 上限超過 ¥${billExtra.toLocaleString()} を請求`:'上限内'}</td></tr>
+  <tr style="font-weight:500"><td>最終支払額</td><td>¥${netReward.toLocaleString()}</td><td>報酬 − 超過材料費</td></tr>
+  </tbody></table>
+  <div class="${billExtra>0?'danger-box':'ok-box'}">${billExtra>0?`材料費が売上の${matRatio}%となり、上限の${matLimit}%を超えています。超過分 ¥${billExtra.toLocaleString()} を請求します。`:`材料費率は${matRatio}%で上限（${matLimit}%）内です。`}</div>`;
+}
+
+function calcMat(){
+  const sales=Number(document.getElementById('mat-sales').value)||0;
+  const cost=Number(document.getElementById('mat-cost').value)||0;
+  const limit=Number(document.getElementById('mat-limit').value)||60;
+  const ratio=sales>0?Math.round((cost/sales)*100):0;
+  const over=ratio>limit;
+  const limitAmt=Math.floor(sales*limit/100);
+  const overAmt=cost-limitAmt;
+  document.getElementById('mat-result').innerHTML=`
+  <div class="${over?'danger-box':'ok-box'}" style="margin-top:.75rem">
+  <strong>材料費率：${ratio}%（上限 ${limit}%）</strong><br>
+  上限額：¥${limitAmt.toLocaleString()}　現在：¥${cost.toLocaleString()}<br>
+  ${over?`⚠ ¥${overAmt.toLocaleString()} 超過。業務委託者への請求対象額：¥${overAmt.toLocaleString()}`:'上限内です。'}
+  </div>
+  <div style="margin-top:.5rem"><div class="progress-bar"><div class="progress-fill" style="width:${Math.min(ratio,100)}%;background:${over?'var(--red)':ratio>50?'var(--amber)':'var(--teal)'}"></div></div>
+  <div style="font-size:11px;color:var(--text3);margin-top:4px;display:flex;justify-content:space-between"><span>0%</span><span>${limit}% 上限</span><span>100%</span></div></div>`;
+}
+
+function renderMaterial(){
+  const wrap=document.getElementById('mat-bill-table');
+  if(!wrap)return;
+  if(outsourceList.length===0){wrap.innerHTML='<p style="font-size:13px;color:var(--text3)">業務委託者を登録してください</p>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>委託者</th><th>報酬率</th><th>材料費上限率</th><th>確認</th></tr></thead><tbody>${
+    outsourceList.map(o=>`<tr><td>${o.name}</td><td>${o.rate}%</td><td>${o.matLimit}%</td><td><button class="small" onclick="nav('outsource')">計算</button></td></tr>`)
+    .join('')}</tbody></table></div>`;
+}
+
+function renderInventory(){
+  const wrap=document.getElementById('inv-table-wrap');
+  if(!wrap)return;
+  if(invList.length===0){wrap.innerHTML='<p style="font-size:13px;color:var(--text3);padding:1rem">品目を追加してください</p>';return;}
+  wrap.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>品名</th><th>カテゴリ</th><th>在庫数</th><th>アラート数</th><th>単価</th><th>操作</th></tr></thead><tbody>${
+    invList.map((inv,i)=>{
+      const low=inv.qty<=inv.alertAt;
+      return `<tr><td>${inv.name}</td><td><span class="badge badge-teal">${inv.cat}</span></td>
+      <td style="${low?'color:var(--red);font-weight:500':''}"><input type="number" value="${inv.qty}" style="width:60px;padding:3px 6px" onchange="updateInvQty(${i},this.value)"> ${low?'⚠':''}</td>
+      <td>${inv.alertAt}</td><td>¥${Number(inv.price).toLocaleString()}</td>
+      <td><button class="small" onclick="delInv(${i})">削除</button></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  const alertList=document.getElementById('inv-alert-list');
+  if(alertList){
+    const alerts=invList.filter(inv=>inv.qty<=inv.alertAt);
+    alertList.innerHTML=alerts.length===0?'<p style="font-size:13px;color:var(--text3);padding:1rem">アラートはありません</p>':
+    alerts.map(inv=>`<div class="danger-box" style="margin-bottom:.5rem"><strong>${inv.name}</strong>（${inv.cat}）：残り ${inv.qty} 個 ／ アラートライン ${inv.alertAt} 個</div>`).join('');
+  }
+}
+function addInv(){
+  const name=document.getElementById('inv-name').value;
+  if(!name)return alert('品名を入力してください');
+  invList.push({name,cat:document.getElementById('inv-cat').value,qty:Number(document.getElementById('inv-qty').value)||0,alertAt:Number(document.getElementById('inv-alert').value)||3,price:document.getElementById('inv-price').value,note:document.getElementById('inv-note').value});
+  save();renderInventory();
+  document.getElementById('inv-name').value='';document.getElementById('inv-qty').value='';document.getElementById('inv-price').value='';document.getElementById('inv-note').value='';
+}
+function updateInvQty(i,v){invList[i].qty=Number(v);save();}
+function delInv(i){if(confirm('削除しますか？')){invList.splice(i,1);save();renderInventory();}}
+
+function setWeekday(){
+  const d=new Date(document.getElementById('ot-tgt').value);
+  document.getElementById('ot-day').value=isNaN(d)?'':DAYS[d.getDay()]+'曜日';
+}
+
+function printOT(){
+  const w=window.open('','_blank','width=800,height:900');
+  w.document.write(`<html><head><meta charset="utf-8"><title>時間外労働申請・報告書</title>
+  <style>body{font-family:"Hiragino Sans",sans-serif;font-size:13px;padding:2rem;max-width:700px;margin:auto}
+  h1{font-size:15px;text-align:center;border:1px solid #000;padding:8px;margin-bottom:1rem}
+  table{width:100%;border-collapse:collapse;margin-bottom:1rem}
+  td{padding:7px 10px;border:1px solid #ccc}td:first-child{background:#f5f5f5;width:40%;font-weight:bold}
+  </style></head><body>
+  <h1>【時間外労働（残業）${document.getElementById('ot-type').value.replace(/（.*）/,'')}書】</h1>
+  <table><tr><td>提出日</td><td>${document.getElementById('ot-date').value}</td></tr>
+  <tr><td>氏名</td><td>${document.getElementById('ot-name').value}</td></tr>
+  <tr><td>区分</td><td>${document.getElementById('ot-type').value}</td></tr>
+  <tr><td>対象日</td><td>${document.getElementById('ot-tgt').value} （${document.getElementById('ot-day').value}）</td></tr>
+  <tr><td>所定シフト</td><td>${document.getElementById('ot-shift').value}</td></tr>
+  <tr><td>退勤時刻</td><td>${document.getElementById('ot-actual').value}</td></tr>
+  <tr><td>時間外労働時間</td><td>${document.getElementById('ot-extra').value}</td></tr>
+  <tr><td>今週の累計時間</td><td>${document.getElementById('ot-weekly').value}</td></tr>
+  <tr><td>対象業務・理由</td><td>${document.getElementById('ot-reason').value}</td></tr>
+  <tr><td>承認日</td><td>${document.getElementById('ot-apv-date').value}</td></tr>
+  <tr><td>承認者名</td><td>${document.getElementById('ot-apv-name').value}<br><br>承認者印：</td></tr>
+  </table></div><!-- /#app -->
+</body></html>`);
+  w.document.close();w.focus();setTimeout(()=>w.print(),400);
+}
+
+function printPL(){
+  const w=window.open('','_blank','width=800,height:900');
+  w.document.write(`<html><head><meta charset="utf-8"><title>有給休暇届</title>
+  <style>body{font-family:"Hiragino Sans",sans-serif;font-size:13px;padding:2rem;max-width:700px;margin:auto}
+  h1{font-size:15px;text-align:center;border:1px solid #000;padding:8px;margin-bottom:1rem}
+  table{width:100%;border-collapse:collapse;margin-bottom:1rem}
+  td{padding:7px 10px;border:1px solid #ccc}td:first-child{background:#f5f5f5;width:40%;font-weight:bold}
+  </style></head><body>
+  <h1>【有給休暇届】</h1>
+  <table><tr><td>提出日</td><td>${document.getElementById('pl-date').value}</td></tr>
+  <tr><td>氏名</td><td>${document.getElementById('pl-name').value}</td></tr>
+  <tr><td>取得区分</td><td>${document.getElementById('pl-type').value}</td></tr>
+  <tr><td>取得日</td><td>${document.getElementById('pl-tgt').value}</td></tr>
+  <tr><td>取得理由</td><td>${document.getElementById('pl-reason').value||'—'}</td></tr>
+  <tr><td>有給残日数</td><td>${document.getElementById('pl-remain').value}日</td></tr>
+  <tr><td>承認日</td><td>${document.getElementById('pl-apv-date').value}</td></tr>
+  <tr><td>承認者名</td><td>${document.getElementById('pl-apv-name').value}<br><br>承認者印：</td></tr>
+  </table></div><!-- /#app -->
+</body></html>`);
+  w.document.close();w.focus();setTimeout(()=>w.print(),400);
+}
+
+renderDashboard();
+
+// ---- ロック機能 ----
+const DEFAULT_PIN='1234';
+function getPin(){return localStorage.getItem('salonPin')||DEFAULT_PIN;}
+let lockInput='';
+function lockKey(k){
+  if(lockInput.length>=4)return;
+  lockInput+=k;
+  updateDots();
+  if(lockInput.length===4){
+    setTimeout(()=>{
+      if(lockInput===getPin()){
+        sessionStorage.setItem('salonAuth','1');
+        document.getElementById('lock-screen').style.display='none';
+        document.getElementById('app').style.display='block';
+        renderDashboard();
+      } else {
+        document.getElementById('lock-error').textContent='コードが違います';
+        lockInput='';updateDots();
+        setTimeout(()=>document.getElementById('lock-error').textContent='',1500);
+      }
+    },120);
+  }
+}
+function lockDel(){if(lockInput.length>0){lockInput=lockInput.slice(0,-1);updateDots();}}
+function updateDots(){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('d'+i);
+    if(d)d.className='lock-dot'+(i<lockInput.length?' filled':'');
+  }
+}
+function lockOut(){sessionStorage.removeItem('salonAuth');location.reload();}
+function changePin(){
+  const old=document.getElementById('pin-old').value;
+  const n1=document.getElementById('pin-new').value;
+  const n2=document.getElementById('pin-new2').value;
+  const msg=document.getElementById('pin-msg');
+  if(old!==getPin()){msg.innerHTML='<div class="danger-box">現在のコードが違います</div>';return;}
+  if(!/^[0-9]{4,8}$/.test(n1)){msg.innerHTML='<div class="warn-box">4〜8桁の数字で設定してください</div>';return;}
+  if(n1!==n2){msg.innerHTML='<div class="danger-box">コードが一致しません</div>';return;}
+  localStorage.setItem('salonPin',n1);
+  msg.innerHTML='<div class="ok-box">暗証番号を変更しました</div>';
+  document.getElementById('pin-old').value='';document.getElementById('pin-new').value='';document.getElementById('pin-new2').value='';
+}
+if(sessionStorage.getItem('salonAuth')==='1'){
+  document.getElementById('lock-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+}
+
+</script>
+</div><!-- /#app -->
+</body></html>
